@@ -1,3 +1,4 @@
+# lambdas/reporter/reporter.py
 import boto3
 import os
 import gzip
@@ -26,6 +27,7 @@ def read_gz_jsonlines(bucket, key):
                 yield json.loads(line)
 
 def lambda_handler(event, context):
+    # default to yesterday's UTC date
     target_date = datetime.datetime.utcnow() - datetime.timedelta(days=1)
     prefix = f"processed/{target_date.strftime('%Y/%m/%d')}/"
     rows = []
@@ -41,6 +43,7 @@ def lambda_handler(event, context):
                 device_stats[dev]["temp_sum"] += float(temp)
                 device_stats[dev]["temp_max"] = max(device_stats[dev]["temp_max"], float(temp))
 
+    # produce CSV temp summary
     date_str = target_date.strftime("%Y-%m-%d")
     report_key = f"reports/{date_str}-device-summary.csv"
     csv_buffer = io.StringIO()
@@ -54,3 +57,4 @@ def lambda_handler(event, context):
     msg = {"report_key": report_key, "bucket": BUCKET, "date": date_str}
     sns.publish(TopicArn=SNS_TOPIC, Message=json.dumps(msg), Subject=f"Daily IoT report {date_str}")
     return {"status": "ok", "report": report_key}
+
